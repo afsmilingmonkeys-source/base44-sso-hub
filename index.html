@@ -111,11 +111,20 @@ document.cookie = `base44_sso_session=${encoded}; Path=/; Max-Age=3600; Secure; 
       });
     });
 
-    // Soporte para callback de OAuth (Google, etc.)
-    if (window.location.hash.includes('access_token')) {
-      // Supabase ya guardó la sesión; solo recargamos para activar localStorage
-      window.location.reload();
+   if (window.location.hash.includes('access_token')) {
+  // Extraer sesión y guardar en cookie
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      const session = JSON.stringify({
+        access_token: data.session.access_token,
+        user: data.session.user
+      });
+      const encoded = btoa(encodeURIComponent(session));
+      document.cookie = `base44_sso_session=${encoded}; Path=/; Max-Age=3600; Secure; SameSite=Lax`;
     }
+  });
+  setTimeout(() => window.location.href = '/hub.html', 500);
+}
   </script>
 </body>
 </html><!-- Auth Hub Base44 -->
