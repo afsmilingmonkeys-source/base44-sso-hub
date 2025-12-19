@@ -89,11 +89,14 @@
         return;
       }
 
-      // ✅ Login exitoso → guardar en localStorage y redirigir al hub o app
-      localStorage.setItem('base44_sso_session', JSON.stringify({
-        access_token: data.session.access_token,
-        user: data.user
-      }));
+    // ✅ Login exitoso → guardar en COOKIE (compartida entre pestañas)
+const session = JSON.stringify({
+  access_token: data.session.access_token,
+  user: data.user
+});
+// Codificar para evitar problemas con comillas
+const encoded = btoa(encodeURIComponent(session));
+document.cookie = `base44_sso_session=${encoded}; Path=/; Max-Age=3600; Secure; SameSite=Lax`;
       document.getElementById('status').innerHTML = '<div class="success">✅ Sesión iniciada. Redirigiendo…</div>';
       setTimeout(() => {
         // Redirige al hub central (cambia esto luego si tienes URL específica)
