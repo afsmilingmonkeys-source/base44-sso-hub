@@ -1,1 +1,118 @@
-<!-- Auth Hub Base44 -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🔐 Base44 SSO</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f9fafb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { opacity: 0.9; }
+    .error { color: #e53e3e; margin-top: 12px; }
+    .success { color: #38a169; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>🔐 Iniciar sesión</h2>
+    <p>Acceso unificado para todas las apps Base44</p>
+
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="Correo" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <button type="submit">Entrar</button>
+    </form>
+
+    <button id="googleLogin" style="background:#4285f4;margin-top:16px">
+      Iniciar con Google
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <!-- Supabase JS SDK -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    // 🔑 CONFIGURACIÓN — reemplaza estos valores en el próximo paso
+    const SUPABASE_URL = 'https://ggzodlospcbrgbnsmkkb.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdnem9kbG9zcGNicmdibnNta2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNTA1MTAsImV4cCI6MjA4MTcyNjUxMH0.4Fks52jLbGuUQddDfhvEOPOKy6AgfNzHesy6frCjjuo';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      document.getElementById('status').innerHTML = '<small>Iniciando sesión…</small>';
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        document.getElementById('status').innerHTML = `<div class="error">❌ ${error.message}</div>`;
+        return;
+      }
+
+      // ✅ Login exitoso → guardar en localStorage y redirigir al hub o app
+      localStorage.setItem('base44_sso_session', JSON.stringify({
+        access_token: data.session.access_token,
+        user: data.user
+      }));
+      document.getElementById('status').innerHTML = '<div class="success">✅ Sesión iniciada. Redirigiendo…</div>';
+      setTimeout(() => {
+        // Redirige al hub central (cambia esto luego si tienes URL específica)
+        window.location.href = 'https://dentalmindsso.netlify.app/hub.html';
+      }, 1000);
+    });
+
+    document.getElementById('googleLogin').addEventListener('click', () => {
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href }
+      });
+    });
+
+    // Soporte para callback de OAuth (Google, etc.)
+    if (window.location.hash.includes('access_token')) {
+      // Supabase ya guardó la sesión; solo recargamos para activar localStorage
+      window.location.reload();
+    }
+  </script>
+</body>
+</html><!-- Auth Hub Base44 -->
