@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SSO Session Helper</title>
+</head>
+<body>
+  <script>
+    // Este archivo se carga en un iframe desde otras apps
+    // Solo su dominio (dentalmindsso.netlify.app) puede leer su localStorage
+    try {
+      const session = localStorage.getItem('base44_sso_session');
+      const data = session ? JSON.parse(session) : null;
+
+      // Envía el estado al padre (la app Base44 que nos cargó)
+      window.parent.postMessage({
+        type: 'SSO_SESSION',
+        session: data
+      }, '*'); // El dominio se valida del lado receptor
+    } catch (e) {
+      window.parent.postMessage({
+        type: 'SSO_SESSION',
+        session: null
+      }, '*');
+    }
+  </script>
+</body>
+</html>
