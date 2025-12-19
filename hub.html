@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🚀 Base44 Hub</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f9fafb;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .status.logged-in {
+      background: #e6f7ee;
+      color: #1a9147;
+    }
+    .status.logged-out {
+      background: #fef7f7;
+      color: #c53030;
+    }
+    .apps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .app-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      text-align: center;
+      text-decoration: none;
+      color: #1a1a1a;
+    }
+    .app-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .app-card.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .login-btn {
+      background: #0070f3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 Base44 Hub</h1>
+      <p>Tus apps, todas en un solo lugar</p>
+    </header>
+
+    <div id="status" class="status logged-out">
+      Cargando estado de sesión…
+    </div>
+
+    <div class="apps" id="apps">
+      <!-- Apps se llenarán dinámicamente -->
+    </div>
+  </div>
+
+  <!-- Cargar el cliente SSO -->
+  <script src="/sso-client.js"></script>
+  <script>
+    // Configura tus 5 apps aquí (reemplaza con tus URLs reales de Base44)
+    const APPS = [
+      { name: "App 1", url: "https://app1.base44.app" },
+      { name: "App 2", url: "https://app2.base44.app" },
+      { name: "App 3", url: "https://app3.base44.app" },
+      { name: "App 4", url: "https://app4.base44.app" },
+      { name: "App 5", url: "https://app5.base44.app" }
+    ];
+
+    // Inicializa el SSO
+    SSO.init({
+      authDomain: 'https://dentalmindsso.netlify.app',
+      onLogin: (user) => {
+        document.getElementById('status').innerHTML = `
+          ✅ Sesión activa: <strong>${user.email}</strong>
+          <br><button onclick="logout()" class="login-btn" style="margin-top:8px">Cerrar sesión</button>
+        `;
+        renderApps(true);
+      },
+      onLogout: () => {
+        document.getElementById('status').className = 'status logged-out';
+        document.getElementById('status').innerHTML = `
+          ❌ No hay sesión activa.
+          <br><a href="/"><button class="login-btn">Iniciar sesión</button></a>
+        `;
+        renderApps(false);
+      }
+    });
+
+    function renderApps(isLoggedIn) {
+      const appsContainer = document.getElementById('apps');
+      appsContainer.innerHTML = APPS.map(app => `
+        <a href="${app.url}" class="app-card ${isLoggedIn ? '' : 'disabled'}">
+          <h3>${app.name}</h3>
+          <p>Ir a app</p>
+        </a>
+      `).join('');
+    }
+
+    function logout() {
+      // Borra la sesión y notifica a todas las pestañas
+      localStorage.removeItem('base44_sso_session');
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('base44-sso');
+        bc.postMessage('logout');
+      }
+      location.reload();
+    }
+
+    // Render inicial (sin sesión)
+    renderApps(false);
+  </script>
+</body>
+</html>
