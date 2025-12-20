@@ -1,63 +1,84 @@
-// sso-client.js — versión robusta con retry y logs
+// sso-client.js — versión final: usa localStorage directo + BroadcastChannel
 (function () {
   const SSO = {
     init(config) {
       this.config = config;
-      this.attempts = 0;
-      this.maxAttempts = 3;
       this.checkSession();
+      this.listenForChanges();
     },
 
-    async checkSession() {
-      if (this.attempts >= this.maxAttempts) {
-        console.warn('[SSO] Máximo de intentos alcanzado. Sesión no detectada.');
-        if (this.config.onLogout) this.config.onLogout();
-        return;
+    checkSession() {
+      // Intentar leer directamente desde localStorage (si estamos en el mismo dominio)
+      try {
+        const sessionStr = localStorage.getItem('base44_sso_session');
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+          if (this.config.onLogin) this.config.onLogin(session.user);
+          return;
+        }
+      } catch (e) {
+        console.warn('[SSO] No se pudo leer localStorage:', e);
       }
 
-      this.attempts++;
+      // Si no hay localStorage, intentar con iframe (fallback)
+      this.checkViaIframe();
+    },
 
-      try {
-        // Crear iframe
-        const iframe = document.createElement('iframe');
-        iframe.id = 'sso-iframe';
-        iframe.style.display = 'none';
-        iframe.src = `${this.config.authDomain}/session.html`;
-        document.body.appendChild(iframe);
+    checkViaIframe() {
+      const iframe = document.createElement('iframe');
+      iframe.id = 'sso-iframe';
+      iframe.style.display = 'none';
+      iframe.src = `${this.config.authDomain}/session.html`;
+      document.body.appendChild(iframe);
 
-        // Promesa para esperar respuesta
-        const response = await new Promise((resolve) => {
-          const handleMessage = (event) => {
-            if (event.origin !== new URL(this.config.authDomain).origin) return;
-            if (event.data.type === 'SSO_SESSION') {
-              window.removeEventListener('message', handleMessage);
-              document.body.removeChild(iframe);
-              resolve(event.data.session);
-            }
-          };
-
-          window.addEventListener('message', handleMessage);
-
-          // Timeout de 2s
-          setTimeout(() => {
-            window.removeEventListener('message', handleMessage);
-            if (iframe.parentNode) document.body.removeChild(iframe);
-            resolve(null);
-          }, 2000);
-        });
-
-        // Procesar respuesta
-        if (response) {
-          console.log('[SSO] Sesión detectada:', response.user.email);
-          if (this.config.onLogin) this.config.onLogin(response.user);
-        } else {
-          console.log('[SSO] No hay sesión activa. Intento #', this.attempts);
-          if (this.config.onLogout) this.config.onLogout();
+      const handleMessage = (event) => {
+        if (event.origin !== new URL(this.config.authDomain).origin) return;
+        if (event.data.type === 'SSO_SESSION') {
+          window.removeEventListener('message', handleMessage);
+          document.body.removeChild(iframe);
+          if (event.data.session) {
+            if (this.config.onLogin) this.config.onLogin(event.data.session.user);
+          } else {
+            if (this.config.onLogout) this.config.onLogout();
+          }
         }
+      };
 
-      } catch (e) {
-        console.error('[SSO] Error al verificar sesión:', e);
+      window.addEventListener('message', handleMessage);
+
+      setTimeout(() => {
+        window.removeEventListener('message', handleMessage);
+        if (iframe.parentNode) document.body.removeChild(iframe);
         if (this.config.onLogout) this.config.onLogout();
+      }, 2000);
+    },
+
+    listenForChanges() {
+      // Escuchar cambios en localStorage (mismo dominio)
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'base44_sso_session') {
+          if (e.newValue === null) {
+            if (this.config.onLogout) this.config.onLogout();
+          } else {
+            try {
+              const user = JSON.parse(e.newValue).user;
+              if (this.config.onLogin) this.config.onLogin(user);
+            } catch (err) {
+              if (this.config.onLogout) this.config.onLogout();
+            }
+          }
+        }
+      });
+
+      // Escuchar mensajes de BroadcastChannel (opcional)
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('base44-sso');
+        bc.onmessage = (event) => {
+          if (event.data === 'login') this.checkSession();
+          if (event.data === 'logout') {
+            if (this.config.onLogout) this.config.onLogout();
+          }
+        };
       }
     }
   };
