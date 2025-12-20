@@ -1,4 +1,4 @@
-// sso-client.js — versión final: usa localStorage directo + BroadcastChannel
+// sso-client.js — versión final: usa cookies directamente
 (function () {
   const SSO = {
     init(config) {
@@ -8,65 +8,35 @@
     },
 
     checkSession() {
-      // Intentar leer directamente desde localStorage (si estamos en el mismo dominio)
-      try {
-        const sessionStr = localStorage.getItem('base44_sso_session');
-        if (sessionStr) {
-          const session = JSON.parse(sessionStr);
-          if (this.config.onLogin) this.config.onLogin(session.user);
-          return;
-        }
-      } catch (e) {
-        console.warn('[SSO] No se pudo leer localStorage:', e);
+      // Leer sesión de COOKIE
+      const session = this.getCookie('base44_sso_session');
+      if (session) {
+        if (this.config.onLogin) this.config.onLogin(session.user);
+      } else {
+        if (this.config.onLogout) this.config.onLogout();
       }
-
-      // Si no hay localStorage, intentar con iframe (fallback)
-      this.checkViaIframe();
     },
 
-    checkViaIframe() {
-      const iframe = document.createElement('iframe');
-      iframe.id = 'sso-iframe';
-      iframe.style.display = 'none';
-      iframe.src = `${this.config.authDomain}/session.html`;
-      document.body.appendChild(iframe);
-
-      const handleMessage = (event) => {
-        if (event.origin !== new URL(this.config.authDomain).origin) return;
-        if (event.data.type === 'SSO_SESSION') {
-          window.removeEventListener('message', handleMessage);
-          document.body.removeChild(iframe);
-          if (event.data.session) {
-            if (this.config.onLogin) this.config.onLogin(event.data.session.user);
-          } else {
-            if (this.config.onLogout) this.config.onLogout();
-          }
+    getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        const raw = parts.pop().split(';').shift();
+        try {
+          const decoded = decodeURIComponent(atob(raw));
+          return JSON.parse(decoded);
+        } catch (e) {
+          return null;
         }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      setTimeout(() => {
-        window.removeEventListener('message', handleMessage);
-        if (iframe.parentNode) document.body.removeChild(iframe);
-        if (this.config.onLogout) this.config.onLogout();
-      }, 2000);
+      }
+      return null;
     },
 
     listenForChanges() {
-      // Escuchar cambios en localStorage (mismo dominio)
+      // Escuchar cambios en localStorage (fallback)
       window.addEventListener('storage', (e) => {
         if (e.key === 'base44_sso_session') {
-          if (e.newValue === null) {
-            if (this.config.onLogout) this.config.onLogout();
-          } else {
-            try {
-              const user = JSON.parse(e.newValue).user;
-              if (this.config.onLogin) this.config.onLogin(user);
-            } catch (err) {
-              if (this.config.onLogout) this.config.onLogout();
-            }
-          }
+          this.checkSession();
         }
       });
 
