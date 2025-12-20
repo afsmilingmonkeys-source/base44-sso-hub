@@ -89,11 +89,13 @@
         return;
       }
 
-    // ✅ Login exitoso → guardar en COOKIE (compartida entre pestañas)
+// ✅ Login exitoso → guardar en COOKIE (compartida entre pestañas)
 const session = JSON.stringify({
   access_token: data.session.access_token,
   user: data.user
 });
+const encoded = btoa(encodeURIComponent(session));
+document.cookie = `base44_sso_session=${encoded}; Path=/; Max-Age=3600; Secure; SameSite=Lax`;
 // Codificar para evitar problemas con comillas
 const encoded = btoa(encodeURIComponent(session));
 document.cookie = `base44_sso_session=${encoded}; Path=/; Max-Age=3600; Secure; SameSite=Lax`;
